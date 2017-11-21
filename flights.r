@@ -1,3 +1,4 @@
+load("flight")
 library(tidyverse)
 library(modelr)
 options(na.action = na.warn)
@@ -145,5 +146,107 @@ ggplot(data = daily)+
   geom_line(mapping = aes(x = date, y = n))+
   geom_line(mapping = aes(x = date, y = pred4, color = "red"))
 ggsave("modpred4_true.jpg")
+
+
+#24.3.5.3
+
+daily <- daily %>%
+  mutate(sat_terms = 
+           case_when(wday == "Sat" & term == "summer" ~ "Sat-summer",
+                     wday == "Sat" & term == "fall" ~ "Sat-fall",
+                     wday == "Sat" & term == "spring" ~ "Sat-spring",
+                     TRUE ~ as.character(wday)))
+mod5 <- lm(n ~ sat_terms, data = daily)
+daily %>% 
+  gather_residuals(sat_term_resid = mod5, wday_terms_resid = mod2) %>% 
+  ggplot(aes(date, resid, colour = model)) +
+  geom_line()
+
+ggsave("sat_term_comp.jpg")
+
+#24.3.5.4
+
+daily <- daily %>%
+  mutate(wday_sat_term_holiday = 
+           case_when(
+             date %in% lubridate::ymd(c(20130101,
+                                        20130121,
+                                        20130527,
+                                        20130704, 
+                                        20130902, 
+                                        20131128,
+                                        20131224,
+                                        20131225)) ~
+               "holiday",
+             wday == "Sat" & term == "summer" ~ "Sat-summer",
+             wday == "Sat" & term == "fall" ~ "Sat-fall",
+             wday == "Sat" & term == "spring" ~ "Sat-spring",
+             TRUE ~ as.character(wday)))
+mod6 <- lm(n ~ wday_sat_term_holiday, data = daily)
+daily %>% 
+  add_residuals(mod6, "mod6_resid") %>% 
+  ggplot(aes(date, mod6_resid)) + 
+  geom_line()
+
+ggsave("holiday.jpg")
+
+
+#24.3.5.5
+
+
+daily <- daily %>% 
+  mutate(month = month(date))
+
+mod7 <- lm(n ~ wday*month, data = daily)
+
+daily %>% 
+  gather_residuals(wday_month_resid = mod7, wday_resid = mod2) %>% 
+  ggplot(aes(date, resid, colour = model)) +
+  geom_line()
+
+ggsave("wday_month_vs_wday_term.jpg")
+
+
+#24.3.5.6
+
+mod8 <- lm(n ~ wday * ns(date, 5), data = daily)
+
+daily %>% 
+  data_grid(wday, date = seq_range(date, n = 13)) %>% 
+  add_predictions(mod8) %>% 
+  ggplot(aes(date, pred, colour = wday)) + 
+  geom_line() +
+  geom_point()
+
+
+ggsave("mod8.jpg")
+
+#24.3.5.7
+
+flight_distance <-flights %>% 
+  mutate(date = make_date(year, month, day),
+         wday = wday(date, label = TRUE)) %>%
+  group_by(wday) %>%
+  summarise(mean_distance =  mean(distance))
+  
+  ggplot(flight_distance,aes(x = wday, y = mean_distance)) +
+  geom_point()
+ggsave("wday_mean_distance.jpg")
+
+flight_time <-flights %>% 
+  mutate(date = make_date(year, month, day),
+         wday = wday(date, label = TRUE)) %>%
+  group_by(wday) %>%
+  summarise(mean_time =  mean(hour))
+ggplot(flight_time,aes(x = wday, y = mean_time)) +
+  geom_point()
+
+ggsave("wday_mean_time.jpg")
+
+
+
+
+save.image("flight")
+
 
 
